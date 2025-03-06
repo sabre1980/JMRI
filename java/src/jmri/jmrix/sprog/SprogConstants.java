@@ -54,7 +54,7 @@ public final class SprogConstants {
      * Slower systems such as Raspberry Pi with flash based file systems are more
      * likely to exhibit longer delays.
      */
-    public static int CS_REPLY_TIMEOUT = 2500;
+    public static int CS_REPLY_TIMEOUT = 250;
 
     /**
      * Timeout for traffic controller to wait for reply from hardware.
