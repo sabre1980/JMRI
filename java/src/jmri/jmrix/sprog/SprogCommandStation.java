@@ -1,18 +1,21 @@
 package jmri.jmrix.sprog;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Vector;
+
 import javax.swing.JOptionPane;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import jmri.CommandStation;
 import jmri.DccLocoAddress;
 import jmri.InstanceManager;
 import jmri.JmriException;
 import jmri.PowerManager;
 import jmri.jmrix.sprog.sprogslotmon.SprogSlotMonDataModel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Control a collection of slots, acting as a soft command station for SPROG
@@ -399,12 +402,18 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
      * 
      */
     public void run() {
+        int noReplyCount = 0;
         log.debug("Command station slot thread starts");
         while(true) {
+            boolean local_replyAvailable = false;
             try {
                 synchronized(lock) {
-                    lock.wait(SprogConstants.CS_REPLY_TIMEOUT);
-                }
+//                    if(!replyAvailable){
+                        lock.wait(SprogConstants.CS_REPLY_TIMEOUT);
+//                        } 
+//                        local_replyAvailable = true;
+//                       replyAvailable=false;
+                }               
             } catch (InterruptedException e) {
                log.debug("Slot thread interrupted");
                // We'll loop around if there's no reply available yet
@@ -438,6 +447,7 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
                     powerChanged = false;
                     time = System.currentTimeMillis();
                 } else if (replyAvailable && (powerState == PowerManager.ON)) {
+//                } else if (local_replyAvailable && (powerState == PowerManager.ON)) {
                     // Received a reply whilst power is on, so send another packet
                     // Get next packet to send if track power is on
                     byte[] p;
@@ -453,7 +463,7 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
                             log.debug("Packet from stack");
                         }
                     }
-                    replyAvailable = false;
+                    replyAvailable = false;         //delete
                     if (p != null) {
                         // Send the packet
                         sendPacket(p, SprogConstants.S_REPEATS);
@@ -471,18 +481,23 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
                     }
                 } else {
                     if (powerState == PowerManager.ON) {
+                         if(noReplyCount<10){
+                            noReplyCount++;
+                            log.warn("{} no replies received",noReplyCount);
+                        } else {
 
                         // Should never get here. Something is wrong so turn power off
                         // Kill reply wait so send doesn't block
-                        log.warn("Slot thread timeout - removing power");
-                        waitingForReply = false;
-                        try {
-                            powerMgr.setPower(PowerManager.OFF);
-                        } catch (JmriException ex) {
-                            log.error("Exception turning power off {}", ex);
-                        }
-                        JOptionPane.showMessageDialog(null, Bundle.getMessage("CSErrorFrameDialogString"),
+                            log.warn("Slot thread timeout - removing power");
+                            waitingForReply = false;
+                            try {
+                                powerMgr.setPower(PowerManager.OFF);
+                            } catch (JmriException ex) {
+                                log.error("Exception turning power off {}", ex);
+                            }
+                            JOptionPane.showMessageDialog(null, Bundle.getMessage("CSErrorFrameDialogString"),
                             Bundle.getMessage("SprogCSTitle"), JOptionPane.ERROR_MESSAGE);
+                        }
                     }
                 }
             }
@@ -553,10 +568,17 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
             
             log.debug("Reply received [{}]", m.toString());
             // Log the reply and wake the slot thread
+            synchronized (lock) {                       //delete
+                replyAvailable = true;                  //delete
+                lock.notifyAll();                       //delete
+            }
+ /*            log.debug("Removing CS Lock");
             synchronized (lock) {
                 replyAvailable = true;
                 lock.notifyAll();
             }
+            log.debug("CS Lock Removed");
+*/
         }
     }
 

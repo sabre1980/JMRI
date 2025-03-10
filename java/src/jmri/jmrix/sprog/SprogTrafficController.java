@@ -201,8 +201,9 @@ public class SprogTrafficController implements SprogInterface, SerialPortEventLi
         final Vector<SprogListener> listeners = this.getCopyOfListeners();
         final SprogReply replyForLater = r;
         final SprogListener senderForLater = lastSender;
-        Runnable rl = () -> {
+        Runnable rl = () -> {           //delete
             log.debug("notifyReply starts last sender: {}", senderForLater);
+            log.debug("notifyReply reply ID: {}", r.getId());
             for (SprogListener listener : listeners) {
                 try {
                 //if is message don't send it back to the originator!
@@ -302,22 +303,27 @@ public class SprogTrafficController implements SprogInterface, SerialPortEventLi
             lastId = messageToSend.message.getId();
             // notify all _other_ listeners
             notifyMessage(messageToSend.message, messageToSend.listener);
-            replyAvailable = false;
+            replyAvailable = false;     //delete
             sendToInterface(messageToSend.message);
             log.debug("Waiting for a reply");
             try {
                 synchronized (lock) {
-                    lock.wait(timeout); // Wait for notify
+//                    while(!replyAvailable){
+                        lock.wait(timeout); // Wait for notify
+//                    }
+//                  replyAvailable = false;
                 }
             } catch (InterruptedException e) {
                 log.debug("waitingForReply interrupted");
             }
-            if (!replyAvailable) {
+            if (!replyAvailable) {      //Delete
                 // Timed out
-                log.warn("Timeout waiting for reply from hardware in SprogState {}", sprogState);
-            } else {
-                log.debug("Notified of reply");
-            }
+                log.warn("Timeout waiting for reply from hardware in SprogState {}", sprogState);   //Delete
+            } else {                    //Delete
+                log.debug("Notified of reply"); //Delete
+            }                           //Delete
+            log.debug("Exited TC Lock");
+            sendreply();
         }
     }
 
@@ -326,8 +332,11 @@ public class SprogTrafficController implements SprogInterface, SerialPortEventLi
      * 
      * @param m The message to be forwarded
      */
+    private volatile int OutputCount=0;
     public void sendToInterface(SprogMessage m) {
         // stream to port in single write, as that's needed by serial
+        OutputCount++;
+        log.debug("Serial Output:{}",OutputCount);
         try {
             if (ostream != null) {
                 ostream.write(m.getFormattedMessage(sprogState));
@@ -451,11 +460,17 @@ public class SprogTrafficController implements SprogInterface, SerialPortEventLi
     /**
      * Handle an incoming reply.
      */
+    private volatile int ReplyCount = 0;
     public void handleOneIncomingReply() {
         // we get here if data has been received and this method is explicitly invoked
         // fill the current reply with any data received
+        reply.setId(lastId);
+        log.debug("Reply ID"+reply.getId());
+        ReplyCount++;
+        log.debug("Serial Replies:{}",ReplyCount);
         int replyCurrentSize = reply.getNumDataElements();
         int i;
+        log.debug("replyCurrentSize={}, SprogReply.maxSize={}",replyCurrentSize,SprogReply.maxSize);
         for (i = replyCurrentSize; i < SprogReply.maxSize - replyCurrentSize; i++) {
             try {
                 if (istream.available() == 0) {
@@ -468,10 +483,18 @@ public class SprogTrafficController implements SprogInterface, SerialPortEventLi
                 log.warn("Exception in DATA_AVAILABLE state: {}", e);
             }
             if (endReply(reply)) {
-                sendreply();
+                log.debug("Releasing TC Lock. ReplyAvailable = {}",replyAvailable);
+/*                 synchronized(lock) {
+                    replyAvailable = true;
+                    lock.notifyAll();
+                }
+                log.debug("TC Lock Released");
+*/
+                sendreply();  //delete
                 break;
             }
         }
+        log.debug("Reply Sent. Reply ID:{}",reply.getId());
     }
 
     /**
@@ -484,14 +507,15 @@ public class SprogTrafficController implements SprogInterface, SerialPortEventLi
             log.debug("Unsolicited Reply");
             reply.setUnsolicited();
         }
+        log.debug("sendreply, replyID:{}, lastID:{}", reply.getId(),lastId);
         // Insert the id
-        reply.setId(lastId);
+        reply.setId(lastId);    //delete
         notifyReply(reply, lastSender);
-        log.debug("Notify() wait");
-        replyAvailable = true;
-        synchronized(lock) {
-            lock.notifyAll();
-        }
+        log.debug("Notify() wait"); //delete
+        replyAvailable = true;          //delete
+        synchronized(lock) {            //delete
+            lock.notifyAll();           //delete
+        }                               //delete
 
         //Create a new reply, ready to be filled
         reply = new SprogReply();
