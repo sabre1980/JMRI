@@ -71,6 +71,7 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
     private boolean replyAvailable = false;
     private boolean sendSprogAddress = false;
     private long time, timeNow, packetDelay;
+private long t[7];
     private int lastId;
 
     PowerManager powerMgr = null;
@@ -646,6 +647,7 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
      */
     public void run() {
         log.debug("Command station slot thread starts");
+t[0]=System.currentTimeMillis();
         while(true) {
             try {
                 synchronized(lock) {
@@ -660,6 +662,7 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
                return;
             }
             log.debug("Slot thread wakes");
+t[1]=System.currentTimeMillis();
 
             if (powerMgr == null) {
                 // Wait until power manager is available
@@ -691,6 +694,7 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
                     // Get next packet to send if track power is on
                     byte[] p;
                     SprogSlot s = sendNow.poll();
+t[2]=System.currentTimeMillis();
                     if (s != null) {
                         // New throttle action to be sent immediately
                         p = s.getPayload();
@@ -702,6 +706,7 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
                             log.debug("Packet from stack");
                         }
                     }
+t[3]=System.currentTimeMillis();
                     replyAvailable = false;
                     if (p != null) {
                         // Send the packet
@@ -712,6 +717,7 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
                         log.debug("Idle sent");
                         sendPacket(jmri.NmraPacket.idlePacket(), SprogConstants.S_REPEATS);
                     }
+t[4]=System.currentTimeMillis();
                     timeNow = System.currentTimeMillis();
                     packetDelay = timeNow - time;
                     time = timeNow;
@@ -792,6 +798,7 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
      */
     @Override
     public void notifyReply(SprogReply m) {
+t[5]=System.currentTimeMillis();
         if (m.getId() != lastId) {
             // Not my id, so not interested, message send still blocked
             log.debug("Ignore reply with mismatched id {} looking for {}", m.getId(), lastId);
@@ -799,10 +806,13 @@ public class SprogCommandStation implements CommandStation, SprogListener, Runna
         } else {
             log.debug("Reply received [{}]", m.toString());
             // Log the reply and wake the slot thread
+t[6]=System.currentTimeMillis();
             synchronized (lock) {
                 replyAvailable = true;
                 lock.notifyAll();
             }
+t[7]=System.currentTimeMillis();
+log.warn("Command Station: t0 {}, t1 {},t2 {}, t3 {},t4 {}, t5 {},t6 {}, t7 {}", t[0], t[1], t[2], t[3], t[4],  t[5], t[6],t[7])
         }
     }
 
