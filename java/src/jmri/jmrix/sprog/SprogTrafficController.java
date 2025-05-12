@@ -295,6 +295,7 @@ public class SprogTrafficController implements SprogInterface,
     public void run() {
         MessageTuple messageToSend;
         log.debug("Traffic controller queuing thread starts");
+t[0]=System.currentTimeMillis();
         while (true) {
             log.debug("Traffic controller queue waiting");
             try {
@@ -303,6 +304,7 @@ public class SprogTrafficController implements SprogInterface,
                 log.debug("Thread interrupted while dequeuing message to send");
                 return;
             }
+t[1]=System.currentTimeMillis();
             log.debug("Message dequeued {} id: {}", messageToSend.message, messageToSend.message.getId());
             // remember who sent this
             lastSender = messageToSend.listener;
@@ -312,6 +314,7 @@ public class SprogTrafficController implements SprogInterface,
             replyAvailable = false;
             sendToInterface(messageToSend.message);
             log.debug("Waiting {} for a reply", timeout);
+t[4]=System.currentTimeMillis();
             try {
                 synchronized (lock) {
                     lock.wait(timeout); // Wait for notify
@@ -319,6 +322,7 @@ public class SprogTrafficController implements SprogInterface,
             } catch (InterruptedException e) {
                 log.debug("waitingForReply interrupted");
             }
+t[5]=System.currentTimeMillis();
             if (!replyAvailable) {
                 // Timed out
                 log.warn("Timeout waiting for reply from hardware in SprogState {}", sprogState);
@@ -335,6 +339,7 @@ public class SprogTrafficController implements SprogInterface,
      */
     public void sendToInterface(SprogMessage m) {
         // stream to port in single write, as that's needed by serial
+t[2]=System.currentTimeMillis();
         try {
             if (ostream != null) {
                 ostream.write(m.getFormattedMessage(sprogState));
@@ -346,6 +351,7 @@ public class SprogTrafficController implements SprogInterface,
         } catch (Exception e) {
             log.warn("sendMessage: Exception: ", e);
         }
+t[3]=System.currentTimeMillis();
     }
 
 // methods to connect/disconnect to a source of data in a SprogPortController
@@ -418,6 +424,7 @@ public class SprogTrafficController implements SprogInterface,
     public void handleOneIncomingReply() {
         // we get here if data has been received and this method is explicitly invoked
         // fill the current reply with any data received
+t[6]=System.currentTimeMillis();
         int replyCurrentSize = reply.getNumDataElements();
         int i;
         for (i = replyCurrentSize; i < SprogReply.maxSize - replyCurrentSize; i++) {
@@ -436,6 +443,7 @@ public class SprogTrafficController implements SprogInterface,
                 break;
             }
         }
+t[7]=System.currentTimeMillis();
     }
 
     /**
@@ -453,9 +461,12 @@ public class SprogTrafficController implements SprogInterface,
         notifyReply(reply, lastSender);
         log.debug("Notify() wait");
         replyAvailable = true;
+t[8]=System.currentTimeMillis();
         synchronized(lock) {
             lock.notifyAll();
         }
+t[9]=System.currentTimeMillis();
+log.warn("Command Station: t0 {}, t1 {},t2 {}, t3 {},t4 {}, t5 {},t6 {}, t7 {}, t8 {}, t9 {}", t[0], t[1], t[2], t[3], t[4],  t[5], t[6],t[7], t[8], t[9])
 
         //Create a new reply, ready to be filled
         reply = new SprogReply();
